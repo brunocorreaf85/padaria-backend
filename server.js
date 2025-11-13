@@ -141,7 +141,70 @@ app.post('/api/materias-primas', verificarToken, async (req, res) => {
 
 app.listen(port, () => {
   console.log(`Servidor rodando na porta ${port}`);
+
+  });
+
+// --- ROTAS PARA RECEITAS (PROTEGIDAS) ---
+
+// Rota para LER todas as receitas
+app.get('/api/receitas', verificarToken, async (req, res) => {
+  try {
+    const todasReceitas = await pool.query('SELECT * FROM Receitas ORDER BY nome ASC');
+    res.json(todasReceitas.rows);
+  } catch (err) {
+    res.status(500).json({ message: 'Erro ao buscar receitas.' });
+  }
 });
+
+// Rota para CRIAR uma nova receita
+app.post('/api/receitas', verificarToken, async (req, res) => {
+  if (req.authData.perfil !== 'ADMIN') {
+    return res.status(403).json({ message: 'Acesso negado.' });
+  }
+
+  const { nome, rendimento, unidade_rendimento, eh_sub_receita, ingredientes } = req.body;
+
+  if (!nome || !rendimento || !unidade_rendimento || !ingredientes || ingredientes.length === 0) {
+    return res.status(400).json({ message: 'Dados da receita incompletos.' });
+  }
+
+  const client = await pool.connect(); // Pega uma conexão para a transação
+
+  try {
+    await client.query('BEGIN'); // Inicia a transação
+
+    const receitaResult = await client.query(
+      'INSERT INTO Receitas (nome, rendimento, unidade_rendimento, eh_sub_receita) VALUES ($1, $2, $3, $4) RETURNING id',
+      [nome, rendimento, unidade_rendimento, eh_sub_receita]
+    );
+    const novaReceitaId = receitaResult.rows[0].id;
+
+    for (const ingrediente of ingredientes) {
+      const query = `
+        INSERT INTO IngredientesReceita (receita_id, materia_prima_id, sub_receita_id, quantidade)
+        VALUES ($1, $2, $3, $4)
+      `;
+      const values = [
+        novaReceitaId,
+        ingrediente.tipo === 'materia_prima' ? ingrediente.id : null,
+        ingrediente.tipo === 'sub_receita' ? ingrediente.id : null,
+        ingrediente.quantidade
+      ];
+      await client.query(query, values);
+    }
+
+    await client.query('COMMIT'); // Confirma a transação
+    res.status(201).json({ message: 'Receita criada com sucesso!', receitaId: novaReceitaId });
+
+  } catch (error) {
+    await client.query('ROLLBACK'); // Desfaz tudo em caso de erro
+    console.error(error);
+    res.status(500).json({ message: 'Erro ao salvar a receita.' });
+  } finally {
+    client.release(); // Libera a conexão
+  }
+});
+
 
 
 
