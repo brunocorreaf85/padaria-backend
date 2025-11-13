@@ -89,7 +89,58 @@ app.get('/', (req, res) => {
   res.send('Backend da padaria com autenticação está no ar!');
 });
 
+// --- ROTAS PARA MATÉRIAS-PRIMAS (PROTEGIDAS) ---
+
+// Middleware para verificar o token
+function verificarToken(req, res, next) {
+  const bearerHeader = req.headers['authorization'];
+  if (typeof bearerHeader !== 'undefined') {
+    const bearerToken = bearerHeader.split(' ')[1];
+    req.token = bearerToken;
+    jwt.verify(req.token, process.env.JWT_SECRET, (err, authData) => {
+      if (err) {
+        return res.sendStatus(403); // Token inválido ou expirado
+      }
+      req.authData = authData;
+      next();
+    });
+  } else {
+    res.sendStatus(401); // Não enviou o token
+  }
+}
+
+// Rota para LER todas as matérias-primas
+app.get('/api/materias-primas', verificarToken, async (req, res) => {
+  try {
+    const todasMateriasPrimas = await pool.query('SELECT * FROM MateriasPrimas ORDER BY nome ASC');
+    res.json(todasMateriasPrimas.rows);
+  } catch (err) {
+    res.status(500).json({ message: 'Erro ao buscar matérias-primas.' });
+  }
+});
+
+// Rota para CRIAR uma nova matéria-prima
+app.post('/api/materias-primas', verificarToken, async (req, res) => {
+  // Apenas Admins podem criar
+  if (req.authData.perfil !== 'ADMIN') {
+    return res.status(403).json({ message: 'Acesso negado. Somente administradores.' });
+  }
+  
+  const { nome, unidade_medida } = req.body;
+  try {
+    const novaMateriaPrima = await pool.query(
+      'INSERT INTO MateriasPrimas (nome, unidade_medida) VALUES ($1, $2) RETURNING *',
+      [nome, unidade_medida]
+    );
+    res.status(201).json(novaMateriaPrima.rows[0]);
+  } catch (err) {
+    res.status(500).json({ message: 'Erro ao criar matéria-prima.' });
+  }
+});
+
+
 app.listen(port, () => {
   console.log(`Servidor rodando na porta ${port}`);
 });
+
 
