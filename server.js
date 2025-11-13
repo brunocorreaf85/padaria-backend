@@ -7,9 +7,9 @@ const cors = require('cors'); // 1. Importe o pacote cors
 const app = express();
 
 // 2. Use o middleware do cors
+app.use(express.json()); // Middleware para entender JSON nas requisições
 app.use(cors()); // Isso permite requisições de QUALQUER origem
 
-app.use(express.json()); // Middleware para entender JSON nas requisições
 const port = process.env.PORT || 3001;
 
 // --- CONFIGURAÇÃO DA CONEXÃO COM O BANCO DE DADOS ---
@@ -142,5 +142,6 @@ app.post('/api/materias-primas', verificarToken, async (req, res) => {
 app.listen(port, () => {
   console.log(`Servidor rodando na porta ${port}`);
 });
+
 
 
