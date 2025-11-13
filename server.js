@@ -2,8 +2,13 @@ const express = require('express');
 const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const cors = require('cors'); // 1. Importe o pacote cors
 
 const app = express();
+
+// 2. Use o middleware do cors
+app.use(cors()); // Isso permite requisições de QUALQUER origem
+
 app.use(express.json()); // Middleware para entender JSON nas requisições
 const port = process.env.PORT || 3001;
 
@@ -87,3 +92,4 @@ app.get('/', (req, res) => {
 app.listen(port, () => {
   console.log(`Servidor rodando na porta ${port}`);
 });
+
